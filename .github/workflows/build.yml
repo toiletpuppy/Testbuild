@@ -11,12 +11,18 @@ jobs:
         run: |
           git clone --branch turbe-engine https://github.com/shenruisi/Stay.git
 
+      - name: Patch ffmpeg-kit dependency in Podfile
+        working-directory: ./Stay
+        run: |
+          echo "Patching ffmpeg-kit-ios-full version from 5.1 to 5.1.1 in Podfile..."
+          sed -i '' "s/'ffmpeg-kit-ios-full', '5\.1'/'ffmpeg-kit-ios-full', '5.1.1'/g" Podfile || echo "No patch needed or pattern not found."
+
       - name: Install CocoaPods
         run: sudo gem install cocoapods
 
       - name: Install Pods
         working-directory: ./Stay
-        run: pod install
+        run: pod install --verbose
 
       - name: Build iOS app (Release scheme)
         working-directory: ./Stay
@@ -43,7 +49,7 @@ jobs:
           echo "IPA uploaded: ${IPA_LINK}"
 
       - name: Upload IPA artifact
-        uses: actions/upload-artifact@v4.6.1
+        uses: actions/upload-artifact@v3
         with:
           name: Stay-unsigned.ipa
           path: ./Stay/Stay-unsigned.ipa
