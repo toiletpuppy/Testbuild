@@ -1,0 +1,49 @@
+name: iOS Build and IPA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Clone external repository
+        run: |
+          git clone --branch turbe-engine https://github.com/shenruisi/Stay.git
+
+      - name: Install CocoaPods
+        run: sudo gem install cocoapods
+
+      - name: Install Pods
+        working-directory: ./Stay
+        run: pod install
+
+      - name: Build iOS app (Release scheme)
+        working-directory: ./Stay
+        run: |
+          xcodebuild -workspace "Stay.xcworkspace" \
+            -scheme "Stay" \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+
+      - name: Package unsigned IPA
+        working-directory: ./Stay
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/Stay.app Payload/
+          cd Payload && zip -r ../Stay-unsigned.ipa . && cd ..
+
+      - name: Upload IPA to bashupload.com
+        working-directory: ./Stay
+        run: |
+          echo "Uploading IPA to bashupload.com..."
+          IPA_LINK=$(curl bashupload.com -T Stay-unsigned.ipa)
+          echo "IPA uploaded: ${IPA_LINK}"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: Stay-unsigned.ipa
+          path: ./Stay/Stay-unsigned.ipa
