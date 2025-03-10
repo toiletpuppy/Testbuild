@@ -120,7 +120,7 @@ jobs:
           fi
 
       - name: Upload IPA as Build Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4.6.1
         with:
           name: $IPA_NAME
           path: ./Stay/"$IPA_NAME"
