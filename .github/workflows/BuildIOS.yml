@@ -63,22 +63,6 @@ jobs:
           echo "Running pod install..."
           pod install --verbose || { echo "pod install failed"; exit 1; }
 
-      - name: (Optional) Configure Code Signing Environment
-        working-directory: ./Stay
-        if: env.KEYCHAIN_PASSWORD != ''
-        run: |
-          echo "Configuring custom keychain for code signing..."
-          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security set-keychain-settings -t 3600 -u build.keychain
-          echo "Importing certificate..."
-          echo "$CERTIFICATE" | base64 --decode > certificate.p12
-          security import certificate.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          echo "Installing provisioning profile..."
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          echo "$PROVISIONING_PROFILE" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
-
       - name: Build iOS App
         working-directory: ./Stay
         run: |
@@ -124,14 +108,3 @@ jobs:
         with:
           name: $IPA_NAME
           path: ./Stay/"$IPA_NAME"
-
-      - name: Final Cleanup
-        working-directory: ./Stay
-        run: |
-          echo "Performing cleanup..."
-          [ -f certificate.p12 ] && rm certificate.p12
-          [ -d "$DOWNLOADS_DIR" ] && rm -rf "$DOWNLOADS_DIR"
-          rm -rf Payload
-          # Optionally delete the custom keychain if it was created.
-          security delete-keychain build.keychain || echo "Keychain already deleted."
-          echo "Cleanup complete."
