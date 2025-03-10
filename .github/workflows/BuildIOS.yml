@@ -15,20 +15,14 @@ jobs:
       SDK: "iphoneos"
       DERIVED_DATA: "build"
       IPA_NAME: "Stay-unsigned.ipa"
-      # URL for the ffmpeg-kit binary (version 6.0)
       BINARY_URL: "https://github.com/arthenica/ffmpeg-kit/releases/download/v6.0/ffmpeg-kit-full-6.0-ios-xcframework.zip"
       DOWNLOADS_DIR: "Downloads"
-      # (Optional) Code signing variables – these must be set as repository secrets if used.
-      KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-      CERTIFICATE: ${{ secrets.CERTIFICATE_BASE64 }}
-      CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
-      PROVISIONING_PROFILE: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
 
     steps:
       - name: Download and Unzip Repository Archive
         run: |
-          echo "Downloading repository archive from https://files.catbox.moe/zjxkk3.zip..."
-          curl -L -o stay.zip https://files.catbox.moe/zjxkk3.zip
+          echo "Downloading repository archive from https://files.catbox.moe/j4y5cd.zip..."
+          curl -L -o stay.zip https://files.catbox.moe/j4y5cd.zip
           echo "Downloaded as stay.zip. Unzipping..."
           unzip stay.zip
           echo "Unzip complete. Listing directory contents:"
@@ -48,14 +42,11 @@ jobs:
           sudo gem install cocoapods || (echo "CocoaPods install failed" && exit 1)
           pod --version
 
-      - name: Clean Previous Build & Pod Artifacts
+      - name: Update pod repos
         working-directory: ./Stay
         run: |
-          echo "Cleaning previous Pods, lockfiles, build data, and IPA..."
-          rm -rf Pods
-          rm -rf "$DERIVED_DATA"
-          rm -f Podfile.lock
-          rm -f "$IPA_NAME"
+          echo "update pod repos..."
+          pod repo update
 
       - name: Install Pods
         working-directory: ./Stay
