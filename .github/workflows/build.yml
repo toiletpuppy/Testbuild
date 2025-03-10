@@ -1,4 +1,4 @@
-name: "Ultra-Advanced iOS Build & IPA Pipeline"
+name: "Ultra-Advanced iOS Build IPA Pipeline"
 
 # This workflow is manually triggered.
 on:
