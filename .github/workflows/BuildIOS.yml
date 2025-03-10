@@ -1,0 +1,137 @@
+name: "Ultra-Advanced iOS Build & IPA Pipeline"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 90
+    env:
+      # General project settings
+      PROJECT_NAME: "Stay"
+      SCHEME_NAME: "Stay"
+      CONFIGURATION: "Release"
+      SDK: "iphoneos"
+      DERIVED_DATA: "build"
+      IPA_NAME: "Stay-unsigned.ipa"
+      # URL for the ffmpeg-kit binary (version 6.0)
+      BINARY_URL: "https://github.com/arthenica/ffmpeg-kit/releases/download/v6.0/ffmpeg-kit-full-6.0-ios-xcframework.zip"
+      DOWNLOADS_DIR: "Downloads"
+      # (Optional) Code signing variables – these must be set as repository secrets if used.
+      KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      CERTIFICATE: ${{ secrets.CERTIFICATE_BASE64 }}
+      CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+      PROVISIONING_PROFILE: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
+
+    steps:
+      - name: Download and Unzip Repository Archive
+        run: |
+          echo "Downloading repository archive from https://files.catbox.moe/za5dae.zip..."
+          curl -L -o stay.zip https://files.catbox.moe/za5dae.zip
+          echo "Downloaded as stay.zip. Unzipping..."
+          unzip stay.zip
+          echo "Unzip complete. Listing directory contents:"
+          ls -la
+
+      - name: Set Up Ruby Environment
+        run: |
+          echo "Installing/updating Ruby via Homebrew..."
+          brew install ruby || echo "Ruby already installed"
+          echo 'export PATH="/usr/local/opt/ruby/bin:$PATH"' >> ~/.bash_profile
+          source ~/.bash_profile
+          ruby -v
+
+      - name: Install CocoaPods
+        run: |
+          echo "Installing CocoaPods..."
+          sudo gem install cocoapods || (echo "CocoaPods install failed" && exit 1)
+          pod --version
+
+      - name: Clean Previous Build & Pod Artifacts
+        working-directory: ./Stay
+        run: |
+          echo "Cleaning previous Pods, lockfiles, build data, and IPA..."
+          rm -rf Pods
+          rm -rf "$DERIVED_DATA"
+          rm -f Podfile.lock
+          rm -f "$IPA_NAME"
+
+      - name: Install Pods
+        working-directory: ./Stay
+        run: |
+          echo "Running pod install..."
+          pod install --verbose || { echo "pod install failed"; exit 1; }
+
+      - name: (Optional) Configure Code Signing Environment
+        working-directory: ./Stay
+        if: env.KEYCHAIN_PASSWORD != ''
+        run: |
+          echo "Configuring custom keychain for code signing..."
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          echo "Importing certificate..."
+          echo "$CERTIFICATE" | base64 --decode > certificate.p12
+          security import certificate.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          echo "Installing provisioning profile..."
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "$PROVISIONING_PROFILE" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+
+      - name: Build iOS App
+        working-directory: ./Stay
+        run: |
+          echo "Starting build using xcodebuild..."
+          xcodebuild -workspace "$PROJECT_NAME.xcworkspace" \
+            -scheme "$SCHEME_NAME" \
+            -configuration "$CONFIGURATION" \
+            -sdk "$SDK" \
+            -derivedDataPath "$DERIVED_DATA" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            || { echo "xcodebuild failed. Dumping build logs:"; exit 1; }
+          echo "Build completed successfully."
+
+      - name: Package Unsigned IPA
+        working-directory: ./Stay
+        run: |
+          echo "Packaging app into IPA..."
+          mkdir -p Payload
+          APP_PATH="$DERIVED_DATA/Build/Products/$CONFIGURATION-iphoneos/$PROJECT_NAME.app"
+          if [ -d "$APP_PATH" ]; then
+            cp -R "$APP_PATH" Payload/
+          else
+            echo "ERROR: App bundle not found at expected path: $APP_PATH"
+            exit 1
+          fi
+          cd Payload && zip -r ../"$IPA_NAME" . && cd ..
+          echo "IPA package created successfully: $(ls -lh "$IPA_NAME")"
+
+      - name: Upload IPA via curl to bashupload.com
+        working-directory: ./Stay
+        run: |
+          echo "Uploading IPA to bashupload.com..."
+          IPA_LINK=$(curl --fail -L bashupload.com -T "$IPA_NAME")
+          if [ -z "$IPA_LINK" ]; then
+            echo "ERROR: Upload failed; no link returned."
+            exit 1
+          else
+            echo "IPA successfully uploaded. Link: ${IPA_LINK}"
+          fi
+
+      - name: Upload IPA as Build Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: $IPA_NAME
+          path: ./Stay/"$IPA_NAME"
+
+      - name: Final Cleanup
+        working-directory: ./Stay
+        run: |
+          echo "Performing cleanup..."
+          [ -f certificate.p12 ] && rm certificate.p12
+          [ -d "$DOWNLOADS_DIR" ] && rm -rf "$DOWNLOADS_DIR"
+          rm -rf Payload
+          # Optionally delete the custom keychain if it was created.
+          security delete-keychain build.keychain || echo "Keychain already deleted."
+          echo "Cleanup complete."
